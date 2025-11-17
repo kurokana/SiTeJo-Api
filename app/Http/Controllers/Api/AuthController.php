@@ -18,17 +18,22 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'nim_nip' => 'nullable|string|unique:users',
-            'role' => 'required|in:mahasiswa,dosen,admin',
+            'nim_nip' => 'required|string|unique:users',
+            'role' => 'required|in:mahasiswa',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8|confirmed',
+        ], [
+            'nim_nip.required' => 'NPM/NIP is required',
+            'nim_nip.unique' => 'NPM/NIP already exists. Each NPM must be unique.',
+            'email.unique' => 'Email already exists.',
+            'role.in' => 'Only students (mahasiswa) can register publicly. Lecturer and admin accounts must be created by an administrator.',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'nim_nip' => $request->nim_nip,
-            'role' => $request->role,
+            'role' => 'mahasiswa', // Force mahasiswa role for public registration
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
         ]);

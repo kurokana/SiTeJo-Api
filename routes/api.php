@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -64,5 +65,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('documents')->group(function () {
         Route::get('/{id}/download', [DocumentController::class, 'download']);
         Route::delete('/{id}', [DocumentController::class, 'destroy']);
+    });
+
+    // User management routes (Admin only)
+    Route::middleware('role:admin')->prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::post('/', [UserController::class, 'store']);
+        Route::get('/{id}', [UserController::class, 'show']);
+        Route::put('/{id}', [UserController::class, 'update']);
+        Route::delete('/{id}', [UserController::class, 'destroy']);
     });
 });
