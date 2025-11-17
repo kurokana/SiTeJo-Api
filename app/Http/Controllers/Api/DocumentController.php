@@ -17,10 +17,18 @@ class DocumentController extends Controller
      */
     public function upload(Request $request, $ticketId)
     {
+        \Log::info('Document upload attempt', [
+            'ticket_id' => $ticketId,
+            'user_id' => $request->user()->id,
+            'has_file' => $request->hasFile('file'),
+            'document_type' => $request->input('document_type')
+        ]);
+
         $user = $request->user();
         $ticket = Ticket::find($ticketId);
 
         if (!$ticket) {
+            \Log::warning('Ticket not found for document upload', ['ticket_id' => $ticketId]);
             return response()->json([
                 'success' => false,
                 'message' => 'Ticket not found'
@@ -29,17 +37,39 @@ class DocumentController extends Controller
 
         // Check access
         if ($user->isMahasiswa() && $ticket->student_id !== $user->id) {
+            \Log::warning('Unauthorized document upload attempt by student', [
+                'user_id' => $user->id,
+                'ticket_student_id' => $ticket->student_id
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized'
             ], 403);
         }
 
-        if ($user->isDosen() && $ticket->lecturer_id !== $user->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($user->isDosen()) {
+            if ($ticket->lecturer_id !== $user->id) {
+                \Log::warning('Unauthorized document upload attempt by lecturer', [
+                    'user_id' => $user->id,
+                    'ticket_lecturer_id' => $ticket->lecturer_id
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
+            
+            // Dosen hanya bisa akses dokumen jika tiket sudah dikirim oleh admin
+            if (!in_array($ticket->status, ['in_review', 'approved', 'rejected', 'completed'])) {
+                \Log::warning('Lecturer tried to upload to pending ticket', [
+                    'ticket_id' => $ticketId,
+                    'status' => $ticket->status
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ticket not yet sent to lecturer'
+                ], 403);
+            }
         }
 
         $request->validate([
@@ -52,6 +82,11 @@ class DocumentController extends Controller
             $file = $request->file('file');
             $fileName = time() . '_' . $file->getClientOriginalName();
             $filePath = $file->storeAs('documents', $fileName, 'public');
+
+            \Log::info('File stored successfully', [
+                'file_name' => $fileName,
+                'file_path' => $filePath
+            ]);
 
             $document = Document::create([
                 'ticket_id' => $ticket->id,
@@ -73,6 +108,8 @@ class DocumentController extends Controller
 
             DB::commit();
 
+            \Log::info('Document uploaded successfully', ['document_id' => $document->id]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Document uploaded successfully',
@@ -80,6 +117,10 @@ class DocumentController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Document upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload document: ' . $e->getMessage()
@@ -110,11 +151,21 @@ class DocumentController extends Controller
             ], 403);
         }
 
-        if ($user->isDosen() && $ticket->lecturer_id !== $user->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($user->isDosen()) {
+            if ($ticket->lecturer_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
+            
+            // Dosen hanya bisa akses dokumen jika tiket sudah dikirim oleh admin
+            if (!in_array($ticket->status, ['in_review', 'approved', 'rejected', 'completed'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ticket not yet sent to lecturer'
+                ], 403);
+            }
         }
 
         $documents = Document::where('ticket_id', $ticketId)
@@ -143,15 +194,43 @@ class DocumentController extends Controller
     /**
      * Download document
      */
-    public function download($id)
+    public function download(Request $request, $id)
     {
-        $document = Document::find($id);
+        $user = $request->user();
+        $document = Document::with('ticket')->find($id);
 
         if (!$document) {
             return response()->json([
                 'success' => false,
                 'message' => 'Document not found'
             ], 404);
+        }
+
+        $ticket = $document->ticket;
+
+        // Check access
+        if ($user->isMahasiswa() && $ticket->student_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ], 403);
+        }
+
+        if ($user->isDosen()) {
+            if ($ticket->lecturer_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
+            
+            // Dosen hanya bisa download dokumen jika tiket sudah dikirim oleh admin
+            if (!in_array($ticket->status, ['in_review', 'approved', 'rejected', 'completed'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ticket not yet sent to lecturer'
+                ], 403);
+            }
         }
 
         $filePath = storage_path('app/public/' . $document->file_path);

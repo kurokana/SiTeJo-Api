@@ -24,8 +24,9 @@ class TicketController extends Controller
             // Mahasiswa hanya lihat ticket miliknya
             $query->where('student_id', $user->id);
         } elseif ($user->isDosen()) {
-            // Dosen lihat ticket yang di-assign ke dia
-            $query->where('lecturer_id', $user->id);
+            // Dosen lihat ticket yang di-assign ke dia dan sudah dikirim oleh admin
+            $query->where('lecturer_id', $user->id)
+                  ->whereIn('status', ['in_review', 'approved', 'rejected', 'completed']);
         }
         // Admin bisa lihat semua ticket
 
@@ -139,11 +140,21 @@ class TicketController extends Controller
             ], 403);
         }
 
-        if ($user->isDosen() && $ticket->lecturer_id !== $user->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ], 403);
+        if ($user->isDosen()) {
+            if ($ticket->lecturer_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 403);
+            }
+            
+            // Dosen hanya bisa akses tiket yang sudah dikirim oleh admin
+            if (!in_array($ticket->status, ['in_review', 'approved', 'rejected', 'completed'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ticket not yet sent to lecturer'
+                ], 403);
+            }
         }
 
         return response()->json([
@@ -157,10 +168,17 @@ class TicketController extends Controller
      */
     public function update(Request $request, $id)
     {
+        \Log::info('Ticket update attempt', [
+            'ticket_id' => $id,
+            'user_id' => $request->user()->id,
+            'request_data' => $request->all()
+        ]);
+
         $user = $request->user();
         $ticket = Ticket::find($id);
 
         if (!$ticket) {
+            \Log::warning('Ticket not found for update', ['ticket_id' => $id]);
             return response()->json([
                 'success' => false,
                 'message' => 'Ticket not found'
@@ -170,21 +188,31 @@ class TicketController extends Controller
         // Check access
         if ($user->isMahasiswa()) {
             if ($ticket->student_id !== $user->id) {
+                \Log::warning('Unauthorized ticket update attempt', [
+                    'user_id' => $user->id,
+                    'ticket_student_id' => $ticket->student_id
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized'
                 ], 403);
             }
 
-            if ($ticket->status !== 'pending') {
+            // Mahasiswa hanya bisa update tiket yang pending atau rejected
+            if (!in_array($ticket->status, ['pending', 'rejected'])) {
+                \Log::warning('Ticket status not allowed for update', [
+                    'ticket_id' => $id,
+                    'status' => $ticket->status
+                ]);
                 return response()->json([
                     'success' => false,
-                    'message' => 'Can only update pending tickets'
+                    'message' => 'Can only update pending or rejected tickets'
                 ], 422);
             }
         }
 
         $request->validate([
+            'lecturer_id' => 'sometimes|required|exists:users,id',
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|required|string',
             'type' => 'sometimes|required|in:surat_keterangan,surat_rekomendasi,ijin,lainnya',
@@ -195,14 +223,37 @@ class TicketController extends Controller
         try {
             $oldData = $ticket->toArray();
             
-            $ticket->update($request->only(['title', 'description', 'type', 'priority']));
+            // Update ticket fields
+            $updateData = $request->only(['lecturer_id', 'title', 'description', 'type', 'priority']);
+            
+            // If ticket was rejected and being updated, reset to pending
+            if ($ticket->status === 'rejected') {
+                $updateData['status'] = 'pending';
+                $updateData['rejection_reason'] = null;
+                $updateData['lecturer_notes'] = null;
+            }
+            
+            $ticket->update($updateData);
+
+            \Log::info('Ticket updated successfully', [
+                'ticket_id' => $ticket->id,
+                'old_status' => $oldData['status'],
+                'new_status' => $ticket->status
+            ]);
 
             // Create history
+            $historyNotes = 'Ticket updated';
+            if ($oldData['status'] === 'rejected') {
+                $historyNotes = 'Ticket revised and resubmitted after rejection';
+            }
+            
             TicketHistory::create([
                 'ticket_id' => $ticket->id,
                 'user_id' => $user->id,
                 'action' => 'updated',
-                'notes' => 'Ticket updated'
+                'old_status' => $oldData['status'],
+                'new_status' => $ticket->status,
+                'notes' => $historyNotes
             ]);
 
             DB::commit();
@@ -214,6 +265,11 @@ class TicketController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Ticket update failed', [
+                'ticket_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update ticket: ' . $e->getMessage()
@@ -305,6 +361,14 @@ class TicketController extends Controller
             ], 403);
         }
 
+        // Dosen hanya bisa approve tiket yang sudah dikirim oleh admin (status in_review)
+        if ($ticket->status !== 'in_review') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket must be in review status to be approved'
+            ], 400);
+        }
+
         $request->validate([
             'lecturer_notes' => 'nullable|string',
         ]);
@@ -365,6 +429,14 @@ class TicketController extends Controller
                 'success' => false,
                 'message' => 'Unauthorized'
             ], 403);
+        }
+
+        // Dosen hanya bisa reject tiket yang sudah dikirim oleh admin (status in_review)
+        if ($ticket->status !== 'in_review') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket must be in review status to be rejected'
+            ], 400);
         }
 
         $request->validate([
@@ -626,16 +698,25 @@ class TicketController extends Controller
         if ($user->isMahasiswa()) {
             $query->where('student_id', $user->id);
         } elseif ($user->isDosen()) {
-            $query->where('lecturer_id', $user->id);
+            // Dosen hanya lihat statistik tiket yang sudah dikirim oleh admin
+            $query->where('lecturer_id', $user->id)
+                  ->whereIn('status', ['in_review', 'approved', 'rejected', 'completed']);
         }
 
         $statistics = [
             'total' => $query->count(),
-            'pending' => (clone $query)->where('status', 'pending')->count(),
-            'in_review' => (clone $query)->where('status', 'in_review')->count(),
-            'approved' => (clone $query)->where('status', 'approved')->count(),
-            'rejected' => (clone $query)->where('status', 'rejected')->count(),
-            'completed' => (clone $query)->where('status', 'completed')->count(),
+            'by_status' => [
+                'pending' => (clone $query)->where('status', 'pending')->count(),
+                'in_review' => (clone $query)->where('status', 'in_review')->count(),
+                'approved' => (clone $query)->where('status', 'approved')->count(),
+                'rejected' => (clone $query)->where('status', 'rejected')->count(),
+                'completed' => (clone $query)->where('status', 'completed')->count(),
+            ],
+            'by_priority' => [
+                'low' => (clone $query)->where('priority', 'rendah')->count(),
+                'medium' => (clone $query)->where('priority', 'sedang')->count(),
+                'high' => (clone $query)->where('priority', 'tinggi')->count(),
+            ]
         ];
 
         return response()->json([
