@@ -51,8 +51,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Admin routes
         Route::middleware('role:admin')->group(function () {
+            Route::post('/{id}/send-to-lecturer', [TicketController::class, 'sendToLecturer']);
+            Route::post('/{id}/reject', [TicketController::class, 'adminReject']);
             Route::post('/{id}/complete', [TicketController::class, 'complete']);
-            Route::delete('/{id}', [TicketController::class, 'destroy']);
         });
     });
 

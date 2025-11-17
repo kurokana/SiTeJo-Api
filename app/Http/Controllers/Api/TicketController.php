@@ -407,7 +407,121 @@ class TicketController extends Controller
     }
 
     /**
-     * Complete ticket (admin only)
+     * Send ticket to lecturer for review (admin only)
+     */
+    public function sendToLecturer(Request $request, $id)
+    {
+        $ticket = Ticket::find($id);
+
+        if (!$ticket) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found'
+            ], 404);
+        }
+
+        if ($ticket->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Can only send pending tickets to lecturer'
+            ], 422);
+        }
+
+        $request->validate([
+            'admin_notes' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $oldStatus = $ticket->status;
+            
+            $ticket->update([
+                'status' => 'in_review',
+                'admin_notes' => $request->admin_notes,
+            ]);
+
+            // Create history
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $request->user()->id,
+                'action' => 'sent_to_lecturer',
+                'old_status' => $oldStatus,
+                'new_status' => 'in_review',
+                'notes' => $request->admin_notes ?? 'Ticket sent to lecturer by admin'
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket sent to lecturer successfully',
+                'data' => $ticket->load(['student', 'lecturer'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send ticket: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin reject ticket
+     */
+    public function adminReject(Request $request, $id)
+    {
+        $ticket = Ticket::find($id);
+
+        if (!$ticket) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found'
+            ], 404);
+        }
+
+        $request->validate([
+            'rejection_reason' => 'required|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $oldStatus = $ticket->status;
+            
+            $ticket->update([
+                'status' => 'rejected',
+                'rejection_reason' => $request->rejection_reason,
+                'admin_notes' => $request->rejection_reason,
+            ]);
+
+            // Create history
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $request->user()->id,
+                'action' => 'rejected_by_admin',
+                'old_status' => $oldStatus,
+                'new_status' => 'rejected',
+                'notes' => $request->rejection_reason
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket rejected successfully',
+                'data' => $ticket->load(['student', 'lecturer'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reject ticket: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete ticket (admin only)
      */
     public function complete(Request $request, $id)
     {
