@@ -18,6 +18,7 @@ class Ticket extends Model
         'type',
         'status',
         'priority',
+        'nomor_surat',
         'admin_notes',
         'lecturer_notes',
         'rejection_reason',

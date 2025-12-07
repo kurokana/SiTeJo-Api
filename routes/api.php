@@ -14,9 +14,14 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::prefix('auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
+    // Registration disabled - users created by admin only
+    // Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
+
+// Verify letter number (public - untuk cek keaslian surat)
+Route::get('/verify-letter/{nomorSurat}', [TicketController::class, 'verifyLetter'])->where('nomorSurat', '.*');
+Route::get('/verify-letter', [TicketController::class, 'verifyLetterQuery']); // Alternatif dengan query string
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {

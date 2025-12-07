@@ -57,15 +57,19 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'identifier' => 'required|string',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // Try to find user by email, nim_nip, or name (for admin/dosen)
+        $user = User::where('email', $request->identifier)
+            ->orWhere('nim_nip', $request->identifier)
+            ->orWhere('name', $request->identifier)
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'identifier' => ['NPM/Email/Username atau password salah.'],
             ]);
         }
 

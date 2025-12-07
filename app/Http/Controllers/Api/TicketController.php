@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
 use App\Models\User;
+use App\Helpers\LetterNumberHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -377,10 +378,14 @@ class TicketController extends Controller
         try {
             $oldStatus = $ticket->status;
             
+            // Generate nomor surat
+            $nomorSurat = LetterNumberHelper::generate($ticket->type);
+            
             $ticket->update([
                 'status' => 'approved',
                 'lecturer_notes' => $request->lecturer_notes,
                 'approved_at' => now(),
+                'nomor_surat' => $nomorSurat,
             ]);
 
             // Create history
@@ -390,7 +395,7 @@ class TicketController extends Controller
                 'action' => 'approved',
                 'old_status' => $oldStatus,
                 'new_status' => 'approved',
-                'notes' => $request->lecturer_notes ?? 'Ticket approved by lecturer'
+                'notes' => ($request->lecturer_notes ?? 'Ticket approved by lecturer') . " | Nomor Surat: {$nomorSurat}"
             ]);
 
             DB::commit();
@@ -739,5 +744,64 @@ class TicketController extends Controller
             'success' => true,
             'data' => $lecturers
         ]);
+    }
+
+    /**
+     * Verify nomor surat untuk cek keaslian
+     */
+    public function verifyLetter($nomorSurat)
+    {
+        $result = LetterNumberHelper::verify($nomorSurat);
+        
+        if (!$result['valid']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message']
+            ], 404);
+        }
+        
+        $ticket = $result['ticket'];
+        $parsed = LetterNumberHelper::parse($nomorSurat);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Nomor surat valid',
+            'data' => [
+                'nomor_surat' => $nomorSurat,
+                'ticket' => [
+                    'id' => $ticket->id,
+                    'title' => $ticket->title,
+                    'type' => $ticket->type,
+                    'status' => $ticket->status,
+                    'student' => [
+                        'name' => $ticket->student->name,
+                        'nim_nip' => $ticket->student->nim_nip
+                    ],
+                    'lecturer' => [
+                        'name' => $ticket->lecturer->name,
+                        'nim_nip' => $ticket->lecturer->nim_nip
+                    ],
+                    'approved_at' => $ticket->approved_at
+                ],
+                'info' => $parsed
+            ]
+        ]);
+    }
+
+    /**
+     * Verify nomor surat via query string (alternatif)
+     */
+    public function verifyLetterQuery(Request $request)
+    {
+        $nomorSurat = $request->query('nomor');
+        
+        if (!$nomorSurat) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter nomor surat tidak ditemukan'
+            ], 400);
+        }
+        
+        return $this->verifyLetter($nomorSurat);
     }
 }

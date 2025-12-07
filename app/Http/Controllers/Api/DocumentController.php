@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
+use App\Services\PdfWatermarkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class DocumentController extends Controller
         }
 
         $request->validate([
-            'file' => 'required|file|max:10240', // Max 10MB
+            'file' => 'required|file|mimes:pdf|max:10240', // Max 10MB, PDF only
             'document_type' => 'required|in:attachment,signed_document',
         ]);
 
@@ -240,6 +241,28 @@ class DocumentController extends Controller
                 'success' => false,
                 'message' => 'File not found'
             ], 404);
+        }
+
+        // Add watermark if PDF and ticket is approved
+        $isPdf = strtolower(pathinfo($document->file_name, PATHINFO_EXTENSION)) === 'pdf';
+        
+        if ($isPdf && $ticket->status === 'approved' && $ticket->nomor_surat) {
+            try {
+                $watermarkService = new PdfWatermarkService();
+                $watermarkedContent = $watermarkService->addWatermarkForDownload(
+                    $document->file_path,
+                    $ticket->nomor_surat,
+                    $ticket->approved_at
+                );
+                
+                return response($watermarkedContent)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'attachment; filename="' . $document->file_name . '"');
+            } catch (\Exception $e) {
+                \Log::error('Failed to add watermark: ' . $e->getMessage());
+                // Fallback to original file if watermark fails
+                return response()->download($filePath, $document->file_name);
+            }
         }
 
         return response()->download($filePath, $document->file_name);

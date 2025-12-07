@@ -13,34 +13,34 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create Admin
+        // Create Admin (Username: Admin System, Password: 123123123)
         User::create([
             'name' => 'Admin System',
             'email' => 'admin@example.com',
-            'nim_nip' => 'ADM001',
+            'nim_nip' => 'admin',
             'role' => 'admin',
             'phone' => '081234567890',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('123123123'),
             'email_verified_at' => now(),
         ]);
 
-        // Create Dosen
+        // Create Dosen (Username: nama mereka, Password: 123123123)
         $dosens = [
             [
                 'name' => 'Dr. Ahmad Sudirman',
-                'email' => 'ahmad.sudirman@example.com',
+                'email' => 'ahmad.sudirman@unila.ac.id',
                 'nim_nip' => '197801012005011001',
                 'phone' => '081234567891',
             ],
             [
                 'name' => 'Prof. Siti Nurhaliza',
-                'email' => 'siti.nurhaliza@example.com',
+                'email' => 'siti.nurhaliza@unila.ac.id',
                 'nim_nip' => '198205152008012001',
                 'phone' => '081234567892',
             ],
             [
                 'name' => 'Dr. Budi Santoso',
-                'email' => 'budi.santoso@example.com',
+                'email' => 'budi.santoso@unila.ac.id',
                 'nim_nip' => '198507202010011002',
                 'phone' => '081234567893',
             ],
@@ -53,53 +53,36 @@ class UserSeeder extends Seeder
                 'nim_nip' => $dosen['nim_nip'],
                 'role' => 'dosen',
                 'phone' => $dosen['phone'],
-                'password' => Hash::make('password'),
+                'password' => Hash::make('123123123'),
                 'email_verified_at' => now(),
             ]);
         }
 
-        // Create Mahasiswa
+        // Create Mahasiswa (Username & Password: NPM mereka)
         $mahasiswas = [
             [
-                'name' => 'Andi Pratama',
-                'email' => 'andi.pratama@student.example.com',
-                'nim_nip' => '2021110001',
-                'phone' => '081234567894',
+                'name' => 'Muhammad Faisal',
+                'email' => '2315061111@students.unila.ac.id',
+                'nim_nip' => '2315061111',
+                'phone' => '085658630968',
             ],
             [
-                'name' => 'Dewi Lestari',
-                'email' => 'dewi.lestari@student.example.com',
-                'nim_nip' => '2021110002',
-                'phone' => '081234567895',
-            ],
-            [
-                'name' => 'Eka Putra',
-                'email' => 'eka.putra@student.example.com',
-                'nim_nip' => '2021110003',
-                'phone' => '081234567896',
-            ],
-            [
-                'name' => 'Fitri Handayani',
-                'email' => 'fitri.handayani@student.example.com',
-                'nim_nip' => '2021110004',
-                'phone' => '081234567897',
-            ],
-            [
-                'name' => 'Gilang Ramadhan',
-                'email' => 'gilang.ramadhan@student.example.com',
-                'nim_nip' => '2021110005',
-                'phone' => '081234567898',
+                'name' => 'Surya Bagaskara',
+                'email' => '2315061031@students.unila.ac.id',
+                'nim_nip' => '2315061031',
+                'phone' => '085283338095',
             ],
         ];
 
         foreach ($mahasiswas as $mahasiswa) {
+            // Password default = NPM
             User::create([
                 'name' => $mahasiswa['name'],
                 'email' => $mahasiswa['email'],
                 'nim_nip' => $mahasiswa['nim_nip'],
                 'role' => 'mahasiswa',
                 'phone' => $mahasiswa['phone'],
-                'password' => Hash::make('password'),
+                'password' => Hash::make($mahasiswa['nim_nip']),
                 'email_verified_at' => now(),
             ]);
         }
