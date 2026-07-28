@@ -1,66 +1,107 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SiTeJo API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+SiTeJo API adalah backend untuk Sistem Informasi Ticketing Persetujuan Tanda Tangan Jurusan Teknik Elektro Universitas Lampung. Service ini dipakai oleh frontend SiTeJo Web untuk autentikasi pengguna, pengelolaan tiket, unggah dokumen, verifikasi surat, dan manajemen pengguna berbasis peran.
 
-## About Laravel
+## Ringkasan
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Backend dibangun dengan Laravel 11.
+- Autentikasi memakai Laravel Sanctum.
+- Akses API dibatasi berdasarkan role `mahasiswa`, `dosen`, dan `admin`.
+- Tersedia endpoint publik untuk verifikasi nomor surat.
+- Registration dari publik dimatikan; pengguna dibuat oleh admin.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Fitur Utama
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Login, logout, dan pembaruan profil pengguna.
+- CRUD tiket pengajuan surat.
+- Review, approve, reject, dan completion flow untuk tiket.
+- Upload, download, dan hapus dokumen pendukung.
+- Manajemen data pengguna untuk admin.
+- Verifikasi keaslian nomor surat melalui endpoint publik.
 
-## Learning Laravel
+## Teknologi
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP 8.2+
+- Laravel 11
+- Laravel Sanctum
+- FPDF dan FPDI untuk kebutuhan dokumen
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Menjalankan Proyek
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 1. Install dependensi
 
-## Laravel Sponsors
+```bash
+composer install
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 2. Siapkan environment
 
-### Premium Partners
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### 3. Jalankan migrasi
 
-## Contributing
+```bash
+php artisan migrate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 4. Jalankan server development
 
-## Code of Conduct
+```bash
+php artisan serve
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Jika ingin menjalankan seluruh proses development yang umum dipakai Laravel, gunakan:
 
-## Security Vulnerabilities
+```bash
+composer run dev
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Endpoint Penting
+
+### Publik
+
+- `POST /api/auth/login` - login pengguna.
+- `GET /api/verify-letter/{nomorSurat}` - verifikasi surat berdasarkan nomor.
+- `GET /api/verify-letter?nomorSurat=...` - alternatif verifikasi lewat query string.
+
+### Terproteksi
+
+- `POST /api/auth/logout` - logout.
+- `GET /api/auth/me` - ambil data pengguna aktif.
+- `PUT /api/auth/profile` - update profil.
+- `PUT /api/auth/change-password` - ubah password.
+- `GET /api/tickets` - daftar tiket.
+- `POST /api/tickets` - buat tiket baru.
+- `PUT /api/tickets/{id}` - ubah tiket.
+- `POST /api/tickets/{id}/review` - review tiket.
+- `POST /api/tickets/{id}/approve` - setujui tiket.
+- `POST /api/tickets/{id}/reject` - tolak tiket.
+- `GET /api/users` - daftar pengguna untuk admin.
+
+## Alur Integrasi dengan SiTeJo Web
+
+1. Pengguna membuka frontend SiTeJo Web.
+2. Login dilakukan lewat API ini menggunakan Sanctum.
+3. Frontend membaca role pengguna dan menampilkan dashboard yang sesuai.
+4. Mahasiswa membuat tiket, dosen memproses review, dan admin memonitor alur serta data pengguna.
+5. Halaman verifikasi surat pada frontend memanggil endpoint publik backend ini.
+
+## Catatan Konfigurasi
+
+- Pastikan `APP_URL`, koneksi database, dan konfigurasi Sanctum sudah sesuai di file `.env`.
+- Jika frontend dan backend berjalan di domain berbeda, sesuaikan pengaturan CORS dan session/Sanctum.
+- Karena registrasi publik dinonaktifkan, akun baru harus dibuat melalui admin atau proses seed internal.
+
+## Struktur Logis
+
+- `app/Http/Controllers/Api` untuk controller API.
+- `routes/api.php` untuk endpoint publik dan terproteksi.
+- `storage/` untuk file sementara dan output dokumen.
+- `database/` untuk migrasi, seeder, dan factory.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Project ini mengikuti lisensi MIT seperti yang digunakan oleh Laravel.
